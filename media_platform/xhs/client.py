@@ -290,10 +290,11 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
     @staticmethod
     def parse_search_recommend_response(res: Dict[str, Any]) -> Dict[str, Any]:
         """
-        解析 /search/recommend 的返回，提取 sug_items 的 text 列表
+        解析 /search/recommend 的返回，提取 sug_items 的 text 列表。
+        兼容 sug_items 在 data 下或响应顶层两种情况。
         """
         data = res.get("data") or {}
-        sug_items = data.get("sug_items") or []
+        sug_items = data.get("sug_items") or res.get("sug_items") or []
         texts: List[str] = []
         for it in sug_items:
             if isinstance(it, dict):
@@ -301,8 +302,8 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
                 if isinstance(t, str) and t.strip():
                     texts.append(t.strip())
         return {
-            "search_cpl_id": data.get("search_cpl_id"),
-            "word_request_id": data.get("word_request_id"),
+            "search_cpl_id": data.get("search_cpl_id") or res.get("search_cpl_id"),
+            "word_request_id": data.get("word_request_id") or res.get("word_request_id"),
             "suggestions": texts,
             "sug_items": sug_items,
         }

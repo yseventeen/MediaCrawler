@@ -230,6 +230,23 @@ class XiaoHongShuCrawler(AbstractCrawler):
                             async with aiofiles.open(hot_query_path, "w", encoding="utf-8") as f:
                                 await f.write(json.dumps(hot_query_out, ensure_ascii=False, indent=2))
 
+                            # 可选：同步到飞书多维表格（通过环境变量启用）
+                            try:
+                                from feishu.sync import sync_xhs_suggestions_to_feishu
+
+                                await sync_xhs_suggestions_to_feishu(
+                                    keyword=keyword_str,
+                                    date_str=date_str,
+                                    recommend_texts=recommend_out.get("suggestions", []) or [],
+                                    hot_query_texts=hot_query_out.get("suggestions", []) or [],
+                                    recommend_meta={
+                                        "search_cpl_id": recommend_out.get("search_cpl_id"),
+                                        "word_request_id": recommend_out.get("word_request_id"),
+                                    },
+                                )
+                            except Exception as e:
+                                utils.logger.warning(f"[XiaoHongShuCrawler.search] Feishu sync skipped/failed: {e}")
+
                             utils.logger.info(
                                 f"[XiaoHongShuCrawler.search] Saved suggestions: recommend={len(recommend_out.get('suggestions', []))} -> {recommend_path}; hot_query={len(hot_query_out.get('suggestions', []))} -> {hot_query_path}"
                             )
