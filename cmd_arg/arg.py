@@ -67,6 +67,7 @@ class CrawlerTypeEnum(str, Enum):
 class SaveDataOptionEnum(str, Enum):
     """Data save option enumeration"""
 
+    FEISHU = "feishu"
     CSV = "csv"
     DB = "db"
     JSON = "json"
@@ -221,11 +222,11 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             SaveDataOptionEnum,
             typer.Option(
                 "--save_data_option",
-                help="Data save option (csv=CSV file | db=MySQL database | json=JSON file | sqlite=SQLite database | mongodb=MongoDB database | excel=Excel file | postgres=PostgreSQL database)",
+                help="Data save option (feishu=only sync to Feishu | csv | db | json | sqlite | mongodb | excel | postgres)",
                 rich_help_panel="Storage Configuration",
             ),
         ] = _coerce_enum(
-            SaveDataOptionEnum, config.SAVE_DATA_OPTION, SaveDataOptionEnum.JSON
+            SaveDataOptionEnum, config.SAVE_DATA_OPTION, SaveDataOptionEnum.FEISHU
         ),
         init_db: Annotated[
             Optional[InitDbOptionEnum],

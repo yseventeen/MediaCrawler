@@ -100,6 +100,29 @@ class XhsJsonStoreImplement(AbstractStore):
         pass
 
 
+class XhsFeishuStoreImplement(AbstractStore):
+    """仅同步到飞书多维表格，不写入本地 data/ 目录。"""
+
+    async def store_content(self, content_item: Dict):
+        try:
+            from feishu.sync import sync_xhs_content_to_feishu
+            await sync_xhs_content_to_feishu(content_item)
+        except Exception as e:
+            utils.logger.warning(f"[XhsFeishuStoreImplement.store_content] {e}")
+
+    async def store_comment(self, comment_item: Dict):
+        try:
+            from feishu.sync import sync_xhs_comment_to_feishu
+            await sync_xhs_comment_to_feishu(comment_item)
+        except Exception as e:
+            utils.logger.warning(f"[XhsFeishuStoreImplement.store_comment] {e}")
+
+    async def store_creator(self, creator_item: Dict):
+        pass
+
+    def flush(self):
+        pass
+
 
 class XhsDbStoreImplement(AbstractStore):
     def __init__(self, **kwargs):

@@ -474,8 +474,9 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
             return res_dict
         # When crawling frequently, some notes may have results while others don't
         utils.logger.error(
-            f"[XiaoHongShuClient.get_note_by_id] get note id:{note_id} empty and res:{res}"
+            f"[XiaoHongShuClient.get_note_by_id] get note id:{note_id} empty (see run log for response)"
         )
+        utils.logger.debug(f"get_note_by_id note_id={note_id} res_keys={list(res.keys()) if isinstance(res, dict) else type(res)}")
         return dict()
 
     async def get_note_comments(
@@ -566,8 +567,9 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
             comments_cursor = comments_res.get("cursor", "")
             if "comments" not in comments_res:
                 utils.logger.info(
-                    f"[XiaoHongShuClient.get_note_all_comments] No 'comments' key found in response: {comments_res}"
+                    "[XiaoHongShuClient.get_note_all_comments] No 'comments' key in response (see run log for details)"
                 )
+                utils.logger.debug(f"get_note_all_comments response keys: {list(comments_res.keys()) if isinstance(comments_res, dict) else type(comments_res)}")
                 break
             comments = comments_res["comments"]
             if len(result) + len(comments) > max_count:
@@ -634,14 +636,14 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
 
                 if comments_res is None:
                     utils.logger.info(
-                        f"[XiaoHongShuClient.get_comments_all_sub_comments] No response found for note_id: {note_id}"
+                        f"[XiaoHongShuClient.get_comments_all_sub_comments] No response for note_id: {note_id}"
                     )
                     continue
                 sub_comment_has_more = comments_res.get("has_more", False)
                 sub_comment_cursor = comments_res.get("cursor", "")
                 if "comments" not in comments_res:
                     utils.logger.info(
-                        f"[XiaoHongShuClient.get_comments_all_sub_comments] No 'comments' key found in response: {comments_res}"
+                        "[XiaoHongShuClient.get_comments_all_sub_comments] No 'comments' key in response"
                     )
                     break
                 comments = comments_res["comments"]
@@ -743,7 +745,7 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
             notes_cursor = notes_res.get("cursor", "")
             if "notes" not in notes_res:
                 utils.logger.info(
-                    f"[XiaoHongShuClient.get_all_notes_by_creator] No 'notes' key found in response: {notes_res}"
+                    "[XiaoHongShuClient.get_all_notes_by_creator] No 'notes' key in response"
                 )
                 break
 

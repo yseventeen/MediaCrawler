@@ -154,7 +154,10 @@ class XiaoHongShuCrawler(AbstractCrawler):
                         page=page,
                         sort=(SearchSortType(config.SORT_TYPE) if config.SORT_TYPE != "" else SearchSortType.GENERAL),
                     )
-                    utils.logger.info(f"[XiaoHongShuCrawler.search] Search notes response: {notes_res}")
+                    items = notes_res.get("items") or []
+                    utils.logger.info(
+                        f"[XiaoHongShuCrawler.search] Search notes: has_more={notes_res.get('has_more')}, items={len(items)}"
+                    )
                     if not notes_res or not notes_res.get("has_more", False):
                         utils.logger.info("[XiaoHongShuCrawler.search] No more content!")
                         break
@@ -202,13 +205,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
                             )
 
                         try:
-                            dir_path = pathlib.Path("data/xhs/suggestions")
-                            dir_path.mkdir(parents=True, exist_ok=True)
-                            safe_name = "".join(
-                                c if c.isalnum() or c in ",_-" else "_" for c in keyword_str
-                            )[:50] or "keyword"
                             date_str = utils.get_current_date()
-
                             recommend_out = {
                                 "keyword": keyword_str,
                                 "generated_at": date_str,
@@ -222,15 +219,20 @@ class XiaoHongShuCrawler(AbstractCrawler):
                                 **notes_cards,
                             }
 
-                            recommend_path = dir_path / f"{date_str}_{safe_name}_recommend.json"
-                            hot_query_path = dir_path / f"{date_str}_{safe_name}_hot_query.json"
+                            # feishu 模式不写本地 data/，仅同步飞书；其他模式写本地并可选同步飞书
+                            if config.SAVE_DATA_OPTION != "feishu":
+                                dir_path = pathlib.Path("data/xhs/suggestions")
+                                dir_path.mkdir(parents=True, exist_ok=True)
+                                safe_name = "".join(
+                                    c if c.isalnum() or c in ",_-" else "_" for c in keyword_str
+                                )[:50] or "keyword"
+                                recommend_path = dir_path / f"{date_str}_{safe_name}_recommend.json"
+                                hot_query_path = dir_path / f"{date_str}_{safe_name}_hot_query.json"
+                                async with aiofiles.open(recommend_path, "w", encoding="utf-8") as f:
+                                    await f.write(json.dumps(recommend_out, ensure_ascii=False, indent=2))
+                                async with aiofiles.open(hot_query_path, "w", encoding="utf-8") as f:
+                                    await f.write(json.dumps(hot_query_out, ensure_ascii=False, indent=2))
 
-                            async with aiofiles.open(recommend_path, "w", encoding="utf-8") as f:
-                                await f.write(json.dumps(recommend_out, ensure_ascii=False, indent=2))
-                            async with aiofiles.open(hot_query_path, "w", encoding="utf-8") as f:
-                                await f.write(json.dumps(hot_query_out, ensure_ascii=False, indent=2))
-
-                            # 可选：同步到飞书多维表格（通过环境变量启用）
                             try:
                                 from feishu.sync import sync_xhs_suggestions_to_feishu
 
@@ -247,9 +249,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
                             except Exception as e:
                                 utils.logger.warning(f"[XiaoHongShuCrawler.search] Feishu sync skipped/failed: {e}")
 
-                            utils.logger.info(
-                                f"[XiaoHongShuCrawler.search] Saved suggestions: recommend={len(recommend_out.get('suggestions', []))} -> {recommend_path}; hot_query={len(hot_query_out.get('suggestions', []))} -> {hot_query_path}"
-                            )
+                            rn, hn = len(recommend_out.get("suggestions", []) or []), len(hot_query_out.get("suggestions", []) or [])
+                            if config.SAVE_DATA_OPTION == "feishu":
+                                utils.logger.info(f"[XiaoHongShuCrawler.search] Suggestions synced to Feishu: recommend={rn}, hot_query={hn}")
+                            else:
+                                utils.logger.info(f"[XiaoHongShuCrawler.search] Saved suggestions: recommend={rn} -> {recommend_path}; hot_query={hn} -> {hot_query_path}")
                         except Exception as e:
                             utils.logger.warning(
                                 f"[XiaoHongShuCrawler.search] Failed to save search suggestions: {e}"
@@ -271,7 +275,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
                             note_ids.append(note_detail.get("note_id"))
                             xsec_tokens.append(note_detail.get("xsec_token"))
                     page += 1
-                    utils.logger.info(f"[XiaoHongShuCrawler.search] Note details: {note_details}")
+                    ok_count = sum(1 for n in note_details if n)
+                    utils.logger.info(f"[XiaoHongShuCrawler.search] Note details: got {ok_count}/{len(note_details)} notes")
                     await self.batch_get_note_comments(note_ids, xsec_tokens)
 
                     # Sleep after each page navigation
@@ -527,9 +532,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 headless=headless,
             )
 
-            # Display browser information
             browser_info = await self.cdp_manager.get_browser_info()
-            utils.logger.info(f"[XiaoHongShuCrawler] CDP browser info: {browser_info}")
+            utils.logger.info(
+                f"[XiaoHongShuCrawler] CDP browser ready"
+                + (f", {browser_info.get('browser', '')} {browser_info.get('version', '')}" if isinstance(browser_info, dict) else "")
+            )
 
             return browser_context
 

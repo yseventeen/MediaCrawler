@@ -48,12 +48,14 @@ class CrawlerTypeEnum(str, Enum):
 
 class SaveDataOptionEnum(str, Enum):
     """Data save option"""
+    FEISHU = "feishu"
     CSV = "csv"
     DB = "db"
     JSON = "json"
     SQLITE = "sqlite"
     MONGODB = "mongodb"
     EXCEL = "excel"
+    POSTGRES = "postgres"
 
 
 class CrawlerStartRequest(BaseModel):
@@ -68,7 +70,7 @@ class CrawlerStartRequest(BaseModel):
     enable_comments: bool = True
     enable_sub_comments: bool = False
     enable_search_suggestions: bool = False  # Xiaohongshu: save recommend/hot query suggestions
-    save_option: SaveDataOptionEnum = SaveDataOptionEnum.JSON
+    save_option: SaveDataOptionEnum = SaveDataOptionEnum.FEISHU
     cookies: str = ""
     headless: bool = False
 

@@ -159,6 +159,7 @@ async def get_config_options():
             {"value": "creator", "label": "Creator Mode"},
         ],
         "save_options": [
+            {"value": "feishu", "label": "Feishu Only (no local data)"},
             {"value": "json", "label": "JSON File"},
             {"value": "csv", "label": "CSV File"},
             {"value": "excel", "label": "Excel File"},

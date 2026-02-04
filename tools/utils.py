@@ -20,21 +20,38 @@
 
 import argparse
 import logging
+import os
 
 from .crawler_util import *
 from .slider_util import *
 from .time_util import *
+
+# 运行日志目录，与 data/ 同级
+LOG_DIR = "logs"
+LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s (%(filename)s:%(lineno)d) - %(message)s"
+LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
 def init_loging_config():
     level = logging.INFO
     logging.basicConfig(
         level=level,
-        format="%(asctime)s %(name)s %(levelname)s (%(filename)s:%(lineno)d) - %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format=LOG_FORMAT,
+        datefmt=LOG_DATEFMT,
     )
     _logger = logging.getLogger("MediaCrawler")
     _logger.setLevel(level)
+
+    # 运行日志写入文件
+    os.makedirs(LOG_DIR, exist_ok=True)
+    try:
+        log_path = os.path.join(LOG_DIR, "mediacrawler.log")
+        fh = logging.FileHandler(log_path, encoding="utf-8")
+        fh.setLevel(level)
+        fh.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATEFMT))
+        _logger.addHandler(fh)
+    except OSError:
+        pass  # 无法创建日志文件时仅控制台输出
 
     # Disable httpx INFO level logs
     logging.getLogger("httpx").setLevel(logging.WARNING)
