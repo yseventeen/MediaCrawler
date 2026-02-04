@@ -158,30 +158,85 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     if not notes_res or not notes_res.get("has_more", False):
                         utils.logger.info("[XiaoHongShuCrawler.search] No more content!")
                         break
-                    # 可选：从第一页响应中解析并保存搜索推荐词（搜索框下方约 10 个联想词）
-                    if config.ENABLE_GET_SEARCH_SUGGESTIONS and page == 1 and notes_res:
-                        suggestions_data = XiaoHongShuClient.parse_search_suggestions_from_response(
-                            notes_res, keyword.strip()
+                    # 可选：保存「猜你想搜」与「大家都在搜」词条（分开两个文件）
+                    if config.ENABLE_GET_SEARCH_SUGGESTIONS and page == 1:
+                        keyword_str = keyword.strip()
+
+                        # 1) 「大家都在搜」/热词卡片（来自 search/notes 返回中的 rec_query/hot_query）
+                        notes_cards = XiaoHongShuClient.parse_search_suggestions_from_response(
+                            notes_res, keyword_str
                         )
-                        if suggestions_data.get("suggestions"):
-                            try:
-                                dir_path = pathlib.Path("data/xhs/suggestions")
-                                dir_path.mkdir(parents=True, exist_ok=True)
-                                safe_name = "".join(
-                                    c if c.isalnum() or c in ",_-" else "_" for c in keyword.strip()
-                                )[:50] or "keyword"
-                                file_path = dir_path / f"{utils.get_current_date()}_{safe_name}.json"
-                                async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-                                    await f.write(
-                                        json.dumps(suggestions_data, ensure_ascii=False, indent=2)
-                                    )
-                                utils.logger.info(
-                                    f"[XiaoHongShuCrawler.search] Saved search suggestions ({len(suggestions_data['suggestions'])} items) to {file_path}"
-                                )
-                            except Exception as e:
-                                utils.logger.warning(
-                                    f"[XiaoHongShuCrawler.search] Failed to save search suggestions: {e}"
-                                )
+                        raw_cards = [
+                            it
+                            for it in (notes_res.get("items") or [])
+                            if it.get("model_type") in ("rec_query", "hot_query")
+                        ]
+                        if raw_cards:
+                            notes_cards["raw_candidates"] = raw_cards
+
+                        # 2) 「猜你想搜」（来自 search/recommend）
+                        recommend: Dict = {
+                            "keyword": keyword_str,
+                            "success": False,
+                            "error": None,
+                            "suggestions": [],
+                            "sug_items": [],
+                            "search_cpl_id": None,
+                            "word_request_id": None,
+                            "raw": None,
+                        }
+                        try:
+                            rec_res = await self.xhs_client.get_search_recommend(keyword_str)
+                            rec_data = XiaoHongShuClient.parse_search_recommend_response(rec_res)
+                            recommend.update(
+                                {
+                                    "success": True,
+                                    "raw": rec_res,
+                                    **rec_data,
+                                }
+                            )
+                        except Exception as e:
+                            recommend["error"] = str(e)
+                            utils.logger.warning(
+                                f"[XiaoHongShuCrawler.search] search/recommend failed: {e}"
+                            )
+
+                        try:
+                            dir_path = pathlib.Path("data/xhs/suggestions")
+                            dir_path.mkdir(parents=True, exist_ok=True)
+                            safe_name = "".join(
+                                c if c.isalnum() or c in ",_-" else "_" for c in keyword_str
+                            )[:50] or "keyword"
+                            date_str = utils.get_current_date()
+
+                            recommend_out = {
+                                "keyword": keyword_str,
+                                "generated_at": date_str,
+                                "source": "search_recommend",
+                                **recommend,
+                            }
+                            hot_query_out = {
+                                "keyword": keyword_str,
+                                "generated_at": date_str,
+                                "source": "search_notes_cards",
+                                **notes_cards,
+                            }
+
+                            recommend_path = dir_path / f"{date_str}_{safe_name}_recommend.json"
+                            hot_query_path = dir_path / f"{date_str}_{safe_name}_hot_query.json"
+
+                            async with aiofiles.open(recommend_path, "w", encoding="utf-8") as f:
+                                await f.write(json.dumps(recommend_out, ensure_ascii=False, indent=2))
+                            async with aiofiles.open(hot_query_path, "w", encoding="utf-8") as f:
+                                await f.write(json.dumps(hot_query_out, ensure_ascii=False, indent=2))
+
+                            utils.logger.info(
+                                f"[XiaoHongShuCrawler.search] Saved suggestions: recommend={len(recommend_out.get('suggestions', []))} -> {recommend_path}; hot_query={len(hot_query_out.get('suggestions', []))} -> {hot_query_path}"
+                            )
+                        except Exception as e:
+                            utils.logger.warning(
+                                f"[XiaoHongShuCrawler.search] Failed to save search suggestions: {e}"
+                            )
                     semaphore = asyncio.Semaphore(config.MAX_CONCURRENCY_NUM)
                     task_list = [
                         self.get_note_detail_async_task(

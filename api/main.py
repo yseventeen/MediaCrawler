@@ -166,6 +166,13 @@ async def get_config_options():
             {"value": "db", "label": "MySQL Database"},
             {"value": "mongodb", "label": "MongoDB Database"},
         ],
+        "feature_flags": [
+            {
+                "value": "enable_search_suggestions",
+                "label": "XHS Search Suggestions (Recommend/Hot Queries)",
+                "default": False,
+            }
+        ],
     }
 
 

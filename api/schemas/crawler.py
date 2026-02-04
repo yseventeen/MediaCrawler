@@ -67,6 +67,7 @@ class CrawlerStartRequest(BaseModel):
     start_page: int = 1
     enable_comments: bool = True
     enable_sub_comments: bool = False
+    enable_search_suggestions: bool = False  # Xiaohongshu: save recommend/hot query suggestions
     save_option: SaveDataOptionEnum = SaveDataOptionEnum.JSON
     cookies: str = ""
     headless: bool = False

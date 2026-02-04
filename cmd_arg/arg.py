@@ -199,6 +199,15 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
                 show_default=True,
             ),
         ] = str(config.ENABLE_GET_SUB_COMMENTS),
+        get_search_suggestions: Annotated[
+            str,
+            typer.Option(
+                "--get_search_suggestions",
+                help="Whether to crawl and save Xiaohongshu search suggestions (recommend/hot queries), supports yes/true/t/y/1 or no/false/f/n/0",
+                rich_help_panel="Basic Configuration",
+                show_default=True,
+            ),
+        ] = str(getattr(config, "ENABLE_GET_SEARCH_SUGGESTIONS", False)),
         headless: Annotated[
             str,
             typer.Option(
@@ -271,6 +280,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
 
         enable_comment = _to_bool(get_comment)
         enable_sub_comment = _to_bool(get_sub_comment)
+        enable_search_suggestions = _to_bool(get_search_suggestions)
         enable_headless = _to_bool(headless)
         init_db_value = init_db.value if init_db else None
 
@@ -286,6 +296,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
         config.KEYWORDS = keywords
         config.ENABLE_GET_COMMENTS = enable_comment
         config.ENABLE_GET_SUB_COMMENTS = enable_sub_comment
+        config.ENABLE_GET_SEARCH_SUGGESTIONS = enable_search_suggestions
         config.HEADLESS = enable_headless
         config.CDP_HEADLESS = enable_headless
         config.SAVE_DATA_OPTION = save_data_option.value
@@ -326,6 +337,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             keywords=config.KEYWORDS,
             get_comment=config.ENABLE_GET_COMMENTS,
             get_sub_comment=config.ENABLE_GET_SUB_COMMENTS,
+            get_search_suggestions=config.ENABLE_GET_SEARCH_SUGGESTIONS,
             headless=config.HEADLESS,
             save_data_option=config.SAVE_DATA_OPTION,
             init_db=init_db_value,

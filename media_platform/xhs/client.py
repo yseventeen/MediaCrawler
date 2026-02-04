@@ -273,6 +273,40 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
         }
         return await self.post(uri, data)
 
+    async def get_search_recommend(self, keyword: str) -> Dict[str, Any]:
+        """
+        获取「猜你想搜」推荐词（搜索框输入关键词后，下方出现的联想词）
+
+        API:
+            GET /api/sns/web/v1/search/recommend?keyword=xxx
+
+        Returns:
+            原始接口返回（含 data.sug_items）
+        """
+        uri = "/api/sns/web/v1/search/recommend"
+        params = {"keyword": keyword}
+        return await self.get(uri, params)
+
+    @staticmethod
+    def parse_search_recommend_response(res: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        解析 /search/recommend 的返回，提取 sug_items 的 text 列表
+        """
+        data = res.get("data") or {}
+        sug_items = data.get("sug_items") or []
+        texts: List[str] = []
+        for it in sug_items:
+            if isinstance(it, dict):
+                t = it.get("text")
+                if isinstance(t, str) and t.strip():
+                    texts.append(t.strip())
+        return {
+            "search_cpl_id": data.get("search_cpl_id"),
+            "word_request_id": data.get("word_request_id"),
+            "suggestions": texts,
+            "sug_items": sug_items,
+        }
+
     @staticmethod
     def _parse_suggestion_item(item: Dict) -> Optional[str]:
         """从搜索接口返回的 rec_query / hot_query 条目中解析出推荐词文本"""
@@ -283,6 +317,23 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
             val = item.get(key)
             if isinstance(val, str) and val.strip():
                 return val.strip()
+        # 嵌套结构：hot_query / rec_query 里可能带 queries[]
+        for nested_key in ("hot_query", "rec_query"):
+            nested = item.get(nested_key)
+            if isinstance(nested, dict):
+                # 有的会直接在 nested 里放 query/keyword/title
+                for key in ("query", "keyword", "title", "desc", "name", "text"):
+                    val = nested.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val.strip()
+                queries = nested.get("queries")
+                if isinstance(queries, list) and queries:
+                    q0 = queries[0]
+                    if isinstance(q0, dict):
+                        for key in ("search_word", "name", "id", "text"):
+                            val = q0.get(key)
+                            if isinstance(val, str) and val.strip():
+                                return val.strip()
         # 嵌套结构，如 query_data.query
         query_data = item.get("query_data") or item.get("recommend_query") or {}
         if isinstance(query_data, dict):
@@ -302,13 +353,34 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
         hot_list: List[str] = []
         for item in search_response.get("items") or []:
             model_type = item.get("model_type")
-            text = XiaoHongShuClient._parse_suggestion_item(item)
-            if not text:
-                continue
             if model_type == "rec_query":
-                rec_list.append(text)
+                nested = item.get("rec_query")
+                if isinstance(nested, dict) and isinstance(nested.get("queries"), list):
+                    for q in nested.get("queries") or []:
+                        if isinstance(q, dict):
+                            for key in ("search_word", "name", "id", "text"):
+                                val = q.get(key)
+                                if isinstance(val, str) and val.strip():
+                                    rec_list.append(val.strip())
+                                    break
+                else:
+                    text = XiaoHongShuClient._parse_suggestion_item(item)
+                    if text:
+                        rec_list.append(text)
             elif model_type == "hot_query":
-                hot_list.append(text)
+                nested = item.get("hot_query")
+                if isinstance(nested, dict) and isinstance(nested.get("queries"), list):
+                    for q in nested.get("queries") or []:
+                        if isinstance(q, dict):
+                            for key in ("search_word", "name", "id", "text"):
+                                val = q.get(key)
+                                if isinstance(val, str) and val.strip():
+                                    hot_list.append(val.strip())
+                                    break
+                else:
+                    text = XiaoHongShuClient._parse_suggestion_item(item)
+                    if text:
+                        hot_list.append(text)
         seen = set()
         suggestions: List[str] = []
         for t in rec_list + hot_list:
